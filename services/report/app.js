@@ -1,4 +1,4 @@
-const RabbitMQService = require('./rabbitmq-service')
+const RabbitMQService = require('./rabbitmq-service.js')
 const path = require('path')
 
 require('dotenv').config({ path: path.resolve(__dirname, '.env') })
@@ -14,17 +14,39 @@ async function updateReport(products) {
             report[product.name]++;
         }
     }
-
 }
 
 async function printReport() {
-    for (const [key, value] of Object.entries(report)) {
-        console.log(`${key} = ${value} sales`);
-      }
+    console.log("--- Relatório de Vendas Atualizado ---");
+    if (Object.keys(report).length === 0) {
+        console.log("Nenhum produto vendido ainda.");
+    } else {
+        for (const [key, value] of Object.entries(report)) {
+            console.log(`- ${key}: ${value} venda(s)`);
+        }
+    }
+    console.log("--------------------------------------");
+}
+
+async function processMessage(msg) {
+    try {
+        console.log("Nova mensagem de relatório recebida...");
+        const orderData = JSON.parse(msg.content);
+        
+        await updateReport(orderData.products);
+        await printReport();
+
+    } catch (error) {
+        console.error("Erro ao processar mensagem:", error);
+    }
 }
 
 async function consume() {
-    //TODO: Constuir a comunicação com a fila 
-} 
+    console.log(`Iniciando consumidor para a fila: ${process.env.RABBITMQ_QUEUE_NAME}`)
+    await (await RabbitMQService.getInstance()).consume(
+        process.env.RABBITMQ_QUEUE_NAME, 
+        (msg) => { processMessage(msg) }
+    )
+}
 
 consume()
